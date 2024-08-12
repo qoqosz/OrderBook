@@ -8,11 +8,10 @@ use std::rc::Rc;
 
 static EPSILON: f64 = 1e-7;
 
-
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Side {
     Bid,
-    Ask
+    Ask,
 }
 
 // https://stackoverflow.com/a/32936064
@@ -53,15 +52,24 @@ impl Order {
         ORDER_ID.with(|thread_id| {
             let id = thread_id.get();
             thread_id.set(id + 1);
-            Order { id, side, price, size, client: Rc::clone(client) }
+            Order {
+                id,
+                side,
+                price,
+                size,
+                client: Rc::clone(client),
+            }
         })
     }
 }
 
 impl fmt::Display for Order {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}@{} {:?} order id {} from client id {}",
-               self.size, self.price, self.side, self.id, self.client.id)
+        write!(
+            f,
+            "{}@{} {:?} order id {} from client id {}",
+            self.size, self.price, self.side, self.id, self.client.id
+        )
     }
 }
 
@@ -69,11 +77,11 @@ type LadderLevel = VecDeque<Order>;
 type Ladder = BTreeMap<OrderedFloat<f64>, LadderLevel>;
 
 pub enum OrderBookResult {
-    OrderId(u64),                       // passive placement
-    Trades(Vec<Trade>),                 // order matched
-    OrderIdTrades(u64, Vec<Trade>),     // order partially matched
-    Error(String),                      // error
-    Canceled,                           // order canceled
+    OrderId(u64),                   // passive placement
+    Trades(Vec<Trade>),             // order matched
+    OrderIdTrades(u64, Vec<Trade>), // order partially matched
+    Error(String),                  // error
+    Canceled,                       // order canceled
 }
 
 pub struct OrderBook {
@@ -85,14 +93,16 @@ pub struct OrderBook {
 impl OrderBook {
     pub fn new() -> OrderBook {
         OrderBook {
-            bids: Ladder::new(), asks: Ladder::new(), lookup: HashMap::new()
+            bids: Ladder::new(),
+            asks: Ladder::new(),
+            lookup: HashMap::new(),
         }
     }
 
     pub fn insert(&mut self, order: Order) -> OrderBookResult {
         match self.validate_order(&order) {
             Err(e) => return OrderBookResult::Error(e),
-            _ => {},
+            _ => {}
         };
 
         if self.is_passive(&order) {
@@ -121,28 +131,33 @@ impl OrderBook {
                 ladder.remove(&OrderedFloat(price));
             }
 
-            return OrderBookResult::Canceled
+            return OrderBookResult::Canceled;
         } else {
-            return OrderBookResult::Error("Order does not exist".to_string())
+            return OrderBookResult::Error("Order does not exist".to_string());
         }
     }
 
     fn validate_order(&self, order: &Order) -> Result<(), String> {
         if order.size > 0 && order.price > 0.0 {
-            return Ok(())
+            return Ok(());
         }
-        Err("Non-positive proce or quantity for an order".to_string())
+        Err("Non-positive price or quantity for an order".to_string())
     }
 
     fn place_passive(&mut self, order: Order) -> u64 {
         let order_id = order.id;
-        self.lookup.insert(order_id, (order.side.clone(), order.price));
+        self.lookup
+            .insert(order_id, (order.side.clone(), order.price));
         let ladder = self.get_ladder_mut(&order.side);
         let price = OrderedFloat(order.price);
 
         match ladder.get_mut(&price) {
-            Some(level) => { (*level).push_back(order); },
-            _ => { ladder.insert(price, VecDeque::from(vec![order])); },
+            Some(level) => {
+                (*level).push_back(order);
+            }
+            _ => {
+                ladder.insert(price, VecDeque::from(vec![order]));
+            }
         };
 
         order_id
@@ -159,7 +174,7 @@ impl OrderBook {
         for (level_price, level) in match order.side {
             Side::Bid => Either::Left(ladder.iter_mut()),
             Side::Ask => Either::Right(ladder.iter_mut().rev()),
-        }{
+        } {
             let level_price = level_price.into_inner();
 
             if is_deeper(level_price, order.price, &order.side) {
@@ -191,7 +206,7 @@ impl OrderBook {
 
         match !trades.is_empty() {
             true => Some(trades),
-            false => None
+            false => None,
         }
     }
 
@@ -250,8 +265,9 @@ impl OrderBook {
         let best_bid = self.best_bid();
         let best_ask = self.best_ask();
 
-        if (order.side == Side::Bid && best_ask.is_none()) ||
-           (order.side == Side::Ask && best_bid.is_none()) {
+        if (order.side == Side::Bid && best_ask.is_none())
+            || (order.side == Side::Ask && best_bid.is_none())
+        {
             true
         } else if order.side == Side::Bid {
             order.price < best_ask.unwrap() - EPSILON
@@ -267,13 +283,21 @@ impl fmt::Display for OrderBook {
         msg = format!("{}--------+-------+--------\n", msg);
 
         for ask in self.asks.keys().rev().take(5) {
-            msg = format!("{}           {:>2.2}   {:>5}\n", msg, ask,
-                          self.get_size(Side::Ask, ask.into_inner()));
+            msg = format!(
+                "{}           {:>2.2}   {:>5}\n",
+                msg,
+                ask,
+                self.get_size(Side::Ask, ask.into_inner())
+            );
         }
 
         for bid in self.bids.keys().rev().take(5) {
-            msg = format!("{}{:>7}    {:>2.2}\n", msg,
-                          self.get_size(Side::Bid, bid.into_inner()), bid);
+            msg = format!(
+                "{}{:>7}    {:>2.2}\n",
+                msg,
+                self.get_size(Side::Bid, bid.into_inner()),
+                bid
+            );
         }
 
         write!(f, "{}", msg)
@@ -300,8 +324,11 @@ impl Trade {
 
 impl fmt::Display for Trade {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Trade id {}, price {}, size {}",
-               self.id, self.price, self.size)
+        write!(
+            f,
+            "Trade id {}, price {}, size {}",
+            self.id, self.price, self.size
+        )
     }
 }
 
