@@ -26,7 +26,7 @@ impl Client {
         CLIENT_ID.with(|thread_id| {
             let id = thread_id.get();
             thread_id.set(id + 1);
-            Client { id: id }
+            Self { id }
         })
     }
 }
@@ -52,7 +52,7 @@ impl Order {
         ORDER_ID.with(|thread_id| {
             let id = thread_id.get();
             thread_id.set(id + 1);
-            Order {
+            Self {
                 id,
                 side,
                 price,
@@ -84,6 +84,7 @@ pub enum OrderBookResult {
     Canceled,                       // order canceled
 }
 
+#[derive(Default)]
 pub struct OrderBook {
     bids: Ladder,
     asks: Ladder,
@@ -92,18 +93,13 @@ pub struct OrderBook {
 
 impl OrderBook {
     pub fn new() -> OrderBook {
-        OrderBook {
-            bids: Ladder::new(),
-            asks: Ladder::new(),
-            lookup: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn insert(&mut self, order: Order) -> OrderBookResult {
-        match self.validate_order(&order) {
-            Err(e) => return OrderBookResult::Error(e),
-            _ => {}
-        };
+        if let Err(e) = self.validate_order(&order) {
+            return OrderBookResult::Error(e);
+        }
 
         if self.is_passive(&order) {
             OrderBookResult::OrderId(self.place_passive(order))
@@ -112,10 +108,10 @@ impl OrderBook {
             let trades = self.match_order(&mut order);
 
             match order.size {
-                0 => OrderBookResult::Trades(trades.unwrap()),
+                0 => OrderBookResult::Trades(trades.unwrap_or_default()),
                 _ => {
                     let order_id = self.place_passive(*order);
-                    OrderBookResult::OrderIdTrades(order_id, trades.unwrap())
+                    OrderBookResult::OrderIdTrades(order_id, trades.unwrap_or_default())
                 }
             }
         }
@@ -146,14 +142,13 @@ impl OrderBook {
 
     fn place_passive(&mut self, order: Order) -> u64 {
         let order_id = order.id;
-        self.lookup
-            .insert(order_id, (order.side.clone(), order.price));
+        self.lookup.insert(order_id, (order.side, order.price));
         let ladder = self.get_ladder_mut(&order.side);
         let price = OrderedFloat(order.price);
 
         match ladder.get_mut(&price) {
             Some(level) => {
-                (*level).push_back(order);
+                level.push_back(order);
             }
             _ => {
                 ladder.insert(price, VecDeque::from(vec![order]));
@@ -204,17 +199,16 @@ impl OrderBook {
             ladder.remove(level_price);
         }
 
-        match !trades.is_empty() {
-            true => Some(trades),
-            false => None,
+        match trades.is_empty() {
+            false => Some(trades),
+            true => None,
         }
     }
 
     fn get_size(&self, side: Side, price: f64) -> u64 {
-        match self.get_ladder(&side).get(&OrderedFloat(price)) {
-            Some(level) => get_level_size(level),
-            _ => 0,
-        }
+        self.get_ladder(&side)
+            .get(&OrderedFloat(price))
+            .map_or(0, get_level_size)
     }
 
     fn get_ladder(&self, side: &Side) -> &Ladder {
@@ -233,32 +227,20 @@ impl OrderBook {
 
     /// Best bid price
     pub fn best_bid(&self) -> Option<f64> {
-        match self.bids.keys().rev().next() {
-            Some(bid) => Some((*bid).into()),
-            None => None,
-        }
+        self.bids.keys().rev().next().map(|bid| (*bid).into())
     }
 
     /// Volume of all orders at best bid price
     pub fn best_bid_size(&self) -> Option<u64> {
-        match self.bids.values().rev().next() {
-            Some(level) => Some(get_level_size(level)),
-            None => None,
-        }
+        self.bids.values().rev().next().map(get_level_size)
     }
 
     pub fn best_ask(&self) -> Option<f64> {
-        match self.asks.keys().next() {
-            Some(ask) => Some((*ask).into()),
-            None => None,
-        }
+        self.asks.keys().next().map(|ask| (*ask).into())
     }
 
     pub fn best_ask_size(&self) -> Option<u64> {
-        match self.asks.values().next() {
-            Some(level) => Some(get_level_size(level)),
-            None => None,
-        }
+        self.asks.values().next().map(get_level_size)
     }
 
     fn is_passive(&self, order: &Order) -> bool {
@@ -317,7 +299,7 @@ impl Trade {
         TRADE_ID.with(|thread_id| {
             let id = thread_id.get();
             thread_id.set(id + 1);
-            Trade { id, price, size }
+            Self { id, price, size }
         })
     }
 }
@@ -333,7 +315,7 @@ impl fmt::Display for Trade {
 }
 
 fn get_level_size(level: &LadderLevel) -> u64 {
-    level.into_iter().map(|order| order.size).sum()
+    level.iter().map(|order| order.size).sum()
 }
 
 /// check if

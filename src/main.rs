@@ -29,9 +29,7 @@ fn main() {
 
     match ob.insert(order) {
         OrderBookResult::Trades(trades) => {
-            for trade in trades {
-                println!("{}\n", trade);
-            }
+            trades.iter().for_each(|trade| println!("{}", trade));
         }
         _ => println!("Sth went wrong"),
     };
@@ -42,19 +40,15 @@ fn main() {
     order = Order::new(Side::Bid, 0.8, 10, &client1);
     println!("Placing order: <{}>", order);
 
-    let order_id = match ob.insert(order) {
-        OrderBookResult::OrderId(id) => id,
-        _ => 0,
-    };
+    if let OrderBookResult::OrderId(order_id) = ob.insert(order) {
+        println!("\nNew order book\n==============\n{}", ob);
+        println!("Canceling order: <{}>", order_id);
 
-    println!("\nNew order book\n==============\n{}", ob);
-    println!("Canceling order: <{}>", order_id);
-
-    match ob.cancel(order_id) {
-        OrderBookResult::Canceled => println!("Order canceled"),
-        _ => println!("Order could not be canceled"),
-    };
-
+        match ob.cancel(order_id) {
+            OrderBookResult::Canceled => println!("Order canceled"),
+            _ => println!("Order could not be canceled"),
+        };
+    }
     println!(
         "Order book back to previous state\n=================================\n{}",
         ob
@@ -66,9 +60,7 @@ fn main() {
 
     match ob.insert(order) {
         OrderBookResult::OrderIdTrades(order_id, trades) => {
-            for trade in trades {
-                println!("{}", trade);
-            }
+            trades.iter().for_each(|trade| println!("{}", trade));
             println!("Order placed: <{}>", order_id);
         }
         _ => println!("Sth went wrong"),
