@@ -1,8 +1,9 @@
 use either::Either;
 use ordered_float::OrderedFloat;
+use rustc_hash::FxHashMap as HashMap;
 use std::cell::Cell;
 use std::cmp::min;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 use std::rc::Rc;
 

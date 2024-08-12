@@ -29,6 +29,7 @@ version = "0.2.0"
 dependencies = [
  "either",
  "ordered-float",
+ "rustc-hash",
 ]
 
 [[package]]
@@ -39,3 +40,9 @@ checksum = "4a91171844676f8c7990ce64959210cd2eaef32c2612c50f9fae9f8aaa6065a6"
 dependencies = [
  "num-traits",
 ]
+
+[[package]]
+name = "rustc-hash"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583034fd73374156e66797ed8e5b0d5690409c9226b22d87cb7f19821c05d152"
