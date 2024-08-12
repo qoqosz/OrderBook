@@ -1,4 +1,4 @@
-use orderbook::book::*;
+use orderbook::book::{Client, Order, OrderBook, OrderBookResult, Side};
 use std::rc::Rc;
 
 fn main() {
@@ -13,7 +13,6 @@ fn main() {
             Order::new(Side::Bid, 1.0, 3, &client1),
             Order::new(Side::Ask, 1.1, 3, &client1),
             Order::new(Side::Ask, 1.2, 2, &client1),
-
             Order::new(Side::Ask, 1.1, 2, &client2),
             Order::new(Side::Ask, 1.3, 6, &client2),
         ];
@@ -33,7 +32,7 @@ fn main() {
             for trade in trades {
                 println!("{}\n", trade);
             }
-        },
+        }
         _ => println!("Sth went wrong"),
     };
 
@@ -56,7 +55,10 @@ fn main() {
         _ => println!("Order could not be canceled"),
     };
 
-    println!("Order book back to previous state\n=================================\n{}", ob);
+    println!(
+        "Order book back to previous state\n=================================\n{}",
+        ob
+    );
 
     // Order that takes all the liquidity
     println!("Taking all the liquidity on the ask side");
@@ -68,7 +70,7 @@ fn main() {
                 println!("{}", trade);
             }
             println!("Order placed: <{}>", order_id);
-        },
+        }
         _ => println!("Sth went wrong"),
     };
 
