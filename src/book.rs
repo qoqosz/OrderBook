@@ -327,3 +327,19 @@ fn is_deeper(a: f64, b: f64, side: &Side) -> bool {
         Side::Ask => a + EPSILON < b,
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_empty_order_book() {
+        let ob = OrderBook::new();
+        assert!(ob.get_ladder(&Side::Bid).is_empty());
+        assert!(ob.get_ladder(&Side::Ask).is_empty());
+        assert_eq!(ob.best_bid(), None);
+        assert_eq!(ob.best_bid_size(), None);
+        assert_eq!(ob.best_ask(), None);
+        assert_eq!(ob.best_ask_size(), None);
+    }
+}
