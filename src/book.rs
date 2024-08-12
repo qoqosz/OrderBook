@@ -81,7 +81,7 @@ pub enum OrderBookResult {
     OrderId(u64),                   // passive placement
     Trades(Vec<Trade>),             // order matched
     OrderIdTrades(u64, Vec<Trade>), // order partially matched
-    Error(String),                  // error
+    Error(&'static str),            // error
     Canceled,                       // order canceled
 }
 
@@ -130,15 +130,15 @@ impl OrderBook {
 
             return OrderBookResult::Canceled;
         } else {
-            return OrderBookResult::Error("Order does not exist".to_string());
+            return OrderBookResult::Error("Order does not exist");
         }
     }
 
-    fn validate_order(&self, order: &Order) -> Result<(), String> {
+    fn validate_order(&self, order: &Order) -> Result<(), &'static str> {
         if order.size > 0 && order.price > 0.0 {
             return Ok(());
         }
-        Err("Non-positive price or quantity for an order".to_string())
+        Err("Non-positive price or quantity for an order")
     }
 
     fn place_passive(&mut self, order: Order) -> u64 {
@@ -228,7 +228,7 @@ impl OrderBook {
 
     /// Best bid price
     pub fn best_bid(&self) -> Option<f64> {
-        self.bids.keys().rev().next().map(|bid| (*bid).into())
+        self.bids.keys().rev().next().map(|bid| bid.into_inner())
     }
 
     /// Volume of all orders at best bid price
@@ -237,7 +237,7 @@ impl OrderBook {
     }
 
     pub fn best_ask(&self) -> Option<f64> {
-        self.asks.keys().next().map(|ask| (*ask).into())
+        self.asks.keys().next().map(|ask| ask.into_inner())
     }
 
     pub fn best_ask_size(&self) -> Option<u64> {
