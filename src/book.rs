@@ -6,6 +6,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 use std::rc::Rc;
+use std::time::SystemTime;
 
 static EPSILON: f64 = 1e-7;
 
@@ -18,6 +19,7 @@ pub enum Side {
 // https://stackoverflow.com/a/32936064
 thread_local!(static CLIENT_ID: Cell<u64> = Cell::new(0));
 
+#[derive(Debug)]
 pub struct Client {
     id: u64,
 }
@@ -40,12 +42,15 @@ impl fmt::Display for Client {
 
 thread_local!(static ORDER_ID: Cell<u64> = Cell::new(0));
 
+#[derive(Debug)]
 pub struct Order {
     id: u64,
     side: Side,
     price: f64,
     size: u64,
     client: Rc<Client>,
+    #[allow(dead_code)]
+    timestamp: u128,
 }
 
 impl Order {
@@ -59,6 +64,7 @@ impl Order {
                 price,
                 size,
                 client: Rc::clone(client),
+                timestamp: get_current_timestamp(),
             }
         })
     }
@@ -85,7 +91,7 @@ pub enum OrderBookResult {
     Canceled,                       // order canceled
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct OrderBook {
     bids: Ladder,
     asks: Ladder,
@@ -293,6 +299,8 @@ pub struct Trade {
     id: u64,
     price: f64,
     size: u64,
+    #[allow(dead_code)]
+    timestamp: u128,
 }
 
 impl Trade {
@@ -300,7 +308,12 @@ impl Trade {
         TRADE_ID.with(|thread_id| {
             let id = thread_id.get();
             thread_id.set(id + 1);
-            Self { id, price, size }
+            Self {
+                id,
+                price,
+                size,
+                timestamp: get_current_timestamp(),
+            }
         })
     }
 }
@@ -315,12 +328,22 @@ impl fmt::Display for Trade {
     }
 }
 
+#[inline(always)]
+fn get_current_timestamp() -> u128 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos()
+}
+
+#[inline]
 fn get_level_size(level: &LadderLevel) -> u64 {
     level.iter().map(|order| order.size).sum()
 }
 
 /// check if
 ///  `a` price level is deeper in the book than `b`
+#[inline(always)]
 fn is_deeper(a: f64, b: f64, side: &Side) -> bool {
     match side {
         Side::Bid => a - EPSILON > b,
