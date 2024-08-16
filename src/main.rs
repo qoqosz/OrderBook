@@ -1,10 +1,9 @@
 use orderbook::book::{Client, Order, OrderBook, OrderBookResult, Side};
-use std::rc::Rc;
 
 fn main() {
     let mut ob = OrderBook::new();
-    let client1 = Rc::new(Client::new());
-    let client2 = Rc::new(Client::new());
+    let client1 = Client::new();
+    let client2 = Client::new();
 
     // Initial order book
     {

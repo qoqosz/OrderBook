@@ -9,3 +9,6 @@ rust-version = "1.70"
 either = "1.13.0"
 ordered-float = "4.2.2"
 rustc-hash = "2.0.0"
+
+[dev-dependencies]
+rstest = "0.22.0"

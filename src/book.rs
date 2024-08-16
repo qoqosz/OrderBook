@@ -25,11 +25,11 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new() -> Client {
+    pub fn new() -> Rc<Client> {
         CLIENT_ID.with(|thread_id| {
             let id = thread_id.get();
             thread_id.set(id + 1);
-            Self { id }
+            Rc::new(Self { id })
         })
     }
 }
@@ -354,15 +354,134 @@ fn is_deeper(a: f64, b: f64, side: &Side) -> bool {
 #[cfg(test)]
 mod test {
     use super::*;
+    use rstest::*;
 
-    #[test]
-    fn test_empty_order_book() {
-        let ob = OrderBook::new();
-        assert!(ob.get_ladder(&Side::Bid).is_empty());
-        assert!(ob.get_ladder(&Side::Ask).is_empty());
+    #[fixture]
+    fn ob() -> OrderBook {
+        OrderBook::new()
+    }
+
+    #[rstest]
+    #[case(Side::Bid)]
+    #[case(Side::Ask)]
+    fn test_empty_order_book(#[by_ref] ob: &OrderBook, #[case] side: Side) {
+        assert!(ob.get_ladder(&side).is_empty());
+    }
+
+    #[rstest]
+    fn test_empty_bid(#[by_ref] ob: &OrderBook) {
         assert_eq!(ob.best_bid(), None);
         assert_eq!(ob.best_bid_size(), None);
+    }
+
+    #[rstest]
+    fn test_empty_ask(#[by_ref] ob: &OrderBook) {
         assert_eq!(ob.best_ask(), None);
         assert_eq!(ob.best_ask_size(), None);
+    }
+
+    #[test]
+    fn test_client_id() {
+        let client1 = Client::new();
+        let client2 = Client::new();
+        assert_ne!(client1.id, client2.id);
+    }
+
+    #[fixture]
+    fn client() -> Rc<Client> {
+        Client::new()
+    }
+
+    #[rstest]
+    #[case(-1.0, 0)]
+    #[case(-1.0, 1)]
+    #[case(0.0, 1)]
+    fn test_invalid_order(
+        #[by_ref] ob: &OrderBook,
+        client: Rc<Client>,
+        #[case] price: f64,
+        #[case] size: u64,
+    ) {
+        let order = Order::new(Side::Bid, price, size, &client);
+        assert!(ob.validate_order(&order).is_err());
+    }
+
+    #[fixture]
+    fn order(client: Rc<Client>) -> Order {
+        Order::new(Side::Bid, 1.0, 1, &client)
+    }
+
+    #[rstest]
+    fn test_valid_order(#[by_ref] ob: &OrderBook, #[by_ref] order: &Order) {
+        assert!(ob.validate_order(&order).is_ok());
+    }
+
+    #[rstest]
+    fn test_passive_placement(mut ob: OrderBook, order: Order) {
+        let result = ob.insert(order);
+        assert!(matches!(result, OrderBookResult::OrderId(_)));
+    }
+
+    #[rstest]
+    fn test_cancel_order(mut ob: OrderBook, order: Order) {
+        let order_id = match ob.insert(order) {
+            OrderBookResult::OrderId(id) => id,
+            _ => unreachable!(),
+        };
+        let result = ob.cancel(order_id);
+        assert!(matches!(result, OrderBookResult::Canceled));
+    }
+
+    #[rstest]
+    fn test_cancel_invalid_order(mut ob: OrderBook, order: Order) {
+        ob.insert(order);
+        let result = ob.cancel(18378);
+        assert!(matches!(result, OrderBookResult::Error(_)));
+    }
+
+    #[rstest]
+    fn test_best_bid(mut ob: OrderBook, client: Rc<Client>) {
+        let prices = vec![1.4, 1.5, 1.6, 1.3, 1.8, 1.4];
+        let sizes = vec![1, 2, 3, 4, 5, 6];
+
+        for (price, size) in prices.iter().zip(sizes.iter()) {
+            let order = Order::new(Side::Bid, *price, *size, &client);
+            ob.insert(order);
+        }
+
+        assert_eq!(ob.best_bid(), Some(1.8));
+        assert_eq!(ob.best_bid_size(), Some(5));
+    }
+
+    #[rstest]
+    fn test_best_ask(mut ob: OrderBook, client: Rc<Client>) {
+        let prices = vec![1.4, 1.5, 1.6, 1.3, 1.8, 1.4];
+        let sizes = vec![1, 2, 3, 4, 5, 6];
+
+        for (price, size) in prices.iter().zip(sizes.iter()) {
+            let order = Order::new(Side::Ask, *price, *size, &client);
+            ob.insert(order);
+        }
+
+        assert_eq!(ob.best_ask(), Some(1.3));
+        assert_eq!(ob.best_ask_size(), Some(4));
+    }
+
+    #[rstest]
+    fn test_partial_fill(mut ob: OrderBook, client: Rc<Client>) {
+        let order1 = Order::new(Side::Bid, 1.5, 1, &client);
+        let order2 = Order::new(Side::Ask, 1.5, 2, &client);
+        ob.insert(order1);
+
+        if let OrderBookResult::OrderIdTrades(_, trades) = ob.insert(order2) {
+            let trade = &trades[0];
+            assert_eq!(trade.price, 1.5);
+            assert_eq!(trade.size, 1);
+            assert_eq!(trades.len(), 1);
+        } else {
+            unreachable!();
+        }
+
+        assert_eq!(ob.best_ask_size(), Some(1));
     }
 }
