@@ -103,6 +103,14 @@ impl OrderBook {
         Self::default()
     }
 
+    pub fn order_count(&self) -> usize {
+        self.bids
+            .values()
+            .chain(self.asks.values())
+            .map(|level| level.len())
+            .sum()
+    }
+
     pub fn insert(&mut self, order: Order) -> OrderBookResult {
         if let Err(e) = self.validate_order(&order) {
             return OrderBookResult::Error(e);
